@@ -27,9 +27,7 @@ jobs:
       - name: Configure and Compile Lynx
         run: |
           cd lynx-source
-
-          # Put Homebrew's openssl/ncurses paths FIRST so they're found
-          # ahead of macOS's system versions (which lack wide-char ncurses).
+          
           export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib -L$(brew --prefix bzip2)/lib"
           export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include -I$(brew --prefix bzip2)/include"
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
@@ -51,6 +49,8 @@ jobs:
           mkdir -p lynx-bin/share
           cp -R "$(brew --prefix ncurses)/share/terminfo" lynx-bin/share/terminfo
 
+          curl -fSL https://curl.se/ca/cacert.pem -o lynx-bin/etc/cacert.pem
+
           cd lynx-bin/bin
           mv lynx lynx-real
           cat > lynx << 'EOF'
@@ -66,6 +66,7 @@ jobs:
           BIN_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
           ROOT_DIR="$(cd "$BIN_DIR/.." >/dev/null 2>&1 && pwd)"
           export TERMINFO="$ROOT_DIR/share/terminfo"
+          export SSL_CERT_FILE="$ROOT_DIR/etc/cacert.pem"
           exec "$BIN_DIR/lynx-real" -cfg="$ROOT_DIR/etc/lynx.cfg" -lss="$ROOT_DIR/etc/lynx.lss" "$@"
           EOF
           chmod +x lynx
