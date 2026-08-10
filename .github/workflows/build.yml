@@ -49,10 +49,6 @@ jobs:
           mkdir -p lynx-bin/share
           cp -R "$(brew --prefix ncurses)/share/terminfo" lynx-bin/share/terminfo
 
-          # Statically-linked OpenSSL still needs a CA certificate bundle at
-          # runtime to verify HTTPS sites - that's data, not code, so it
-          # wasn't pulled in by static linking. Bundle the standard
-          # curl/Mozilla trust bundle so HTTPS works without prompting.
           curl -fSL https://curl.se/ca/cacert.pem -o lynx-bin/etc/cacert.pem
 
           cat > lynx-bin/etc/mime.types << 'EOF'
@@ -100,7 +96,12 @@ jobs:
           fi
           sed "s#__MPV_PATH__#$MPV_PATH#" "$ROOT_DIR/etc/mailcap" > "$MAILCAP_TMP"
 
-          exec "$BIN_DIR/lynx-real" -cfg="$ROOT_DIR/etc/lynx.cfg" -lss="$ROOT_DIR/etc/lynx.lss" -mime_types="$ROOT_DIR/etc/mime.types" -mailcap="$MAILCAP_TMP" "$@"
+          CFG_TMP="$(mktemp)"
+          cat "$ROOT_DIR/etc/lynx.cfg" > "$CFG_TMP"
+          echo "PERSONAL_MAILCAP:$MAILCAP_TMP" >> "$CFG_TMP"
+          echo "PERSONAL_MIME_TYPES:$ROOT_DIR/etc/mime.types" >> "$CFG_TMP"
+
+          exec "$BIN_DIR/lynx-real" -cfg="$CFG_TMP" -lss="$ROOT_DIR/etc/lynx.lss" "$@"
           EOF
           chmod +x lynx
 
