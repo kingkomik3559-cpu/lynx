@@ -27,7 +27,7 @@ jobs:
       - name: Configure and Compile Lynx
         run: |
           cd lynx-source
-
+          
           export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib -L$(brew --prefix bzip2)/lib"
           export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include -I$(brew --prefix bzip2)/include"
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
@@ -51,12 +51,5 @@ jobs:
       - name: Compress and Upload Lynx Binary Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-Lynx-Executable
-          path: lynx-bin/          
-          
-      - name: Compress and Upload Lynx Binary Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-Lynx-Executable
+          name: macOS-Lynx-Executable-${{ github.run_id }}-${{ github.run_attempt }}
           path: lynx-bin/
- 
