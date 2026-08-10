@@ -85,12 +85,38 @@ jobs:
           audio/aac       aac
           audio/x-m4a     m4a
           audio/x-ms-wma  wma
+          application/pdf pdf
+          application/msword doc
+          application/vnd.openxmlformats-officedocument.wordprocessingml.document docx
+          application/vnd.ms-excel xls
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet xlsx
+          application/vnd.ms-powerpoint ppt
+          application/vnd.openxmlformats-officedocument.presentationml.presentation pptx
+          application/zip zip
+          application/x-gzip gz tgz
+          application/x-tar tar
+          application/json json
+          text/markdown md markdown
+          text/csv csv
           EOF
 
           cat > lynx-bin/etc/mailcap << 'EOF'
           image/*; open -a Preview.app %s
           video/*; __MPV_PATH__ %s
           audio/*; __MPV_PATH__ %s
+          application/pdf; open -a Preview.app %s
+          application/msword; open %s
+          application/vnd.openxmlformats-officedocument.wordprocessingml.document; open %s
+          application/vnd.ms-excel; open %s
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; open %s
+          application/vnd.ms-powerpoint; open %s
+          application/vnd.openxmlformats-officedocument.presentationml.presentation; open %s
+          application/zip; open %s
+          application/x-gzip; open %s
+          application/x-tar; open %s
+          application/json; jq . %s | less
+          text/markdown; glow %s
+          text/csv; vd %s
           EOF
 
           cd lynx-bin/bin
@@ -118,6 +144,11 @@ jobs:
           fi
           sed "s#__MPV_PATH__#$MPV_PATH#" "$ROOT_DIR/etc/mailcap" > "$MAILCAP_TMP"
 
+          # Lynx has no -mime_types/-mailcap command-line flags (that was my
+          # mistake earlier) - those are only settable inside lynx.cfg via
+          # the PERSONAL_MAILCAP / PERSONAL_MIME_TYPES directives. So build a
+          # temporary cfg on top of the bundled one with those two lines
+          # appended, pointing at our resolved absolute paths.
           CFG_TMP="$(mktemp)"
           cat "$ROOT_DIR/etc/lynx.cfg" > "$CFG_TMP"
           echo "PERSONAL_MAILCAP:$MAILCAP_TMP" >> "$CFG_TMP"
