@@ -27,7 +27,9 @@ jobs:
       - name: Configure and Compile Lynx
         run: |
           cd lynx-source
-          
+
+          # Put Homebrew's openssl/ncurses paths FIRST so they're found
+          # ahead of macOS's system versions (which lack wide-char ncurses).
           export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib -L$(brew --prefix bzip2)/lib"
           export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include -I$(brew --prefix bzip2)/include"
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
@@ -44,9 +46,33 @@ jobs:
           make
           make install
 
+      - name: Create self-locating launcher script
+        run: |
+          mkdir -p lynx-bin/share
+          cp -R "$(brew --prefix ncurses)/share/terminfo" lynx-bin/share/terminfo
+
+          cd lynx-bin/bin
+          mv lynx lynx-real
+          cat > lynx << 'EOF'
+          #!/bin/bash
+          # Resolve the real path to this script's directory, even if invoked
+          # via a symlink or from a different working directory.
+          SOURCE="${BASH_SOURCE[0]}"
+          while [ -L "$SOURCE" ]; do
+            DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+            SOURCE="$(readlink "$SOURCE")"
+            [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+          done
+          BIN_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+          ROOT_DIR="$(cd "$BIN_DIR/.." >/dev/null 2>&1 && pwd)"
+          export TERMINFO="$ROOT_DIR/share/terminfo"
+          exec "$BIN_DIR/lynx-real" -cfg="$ROOT_DIR/etc/lynx.cfg" -lss="$ROOT_DIR/etc/lynx.lss" "$@"
+          EOF
+          chmod +x lynx
+
       - name: Verify no Homebrew dependencies remain linked
         run: |
-          otool -L lynx-bin/bin/lynx | grep -i homebrew || echo "Clean — no Homebrew paths linked."
+          otool -L lynx-bin/bin/lynx-real | grep -i homebrew || echo "Clean — no Homebrew paths linked."
 
       - name: Compress and Upload Lynx Binary Artifact
         uses: actions/upload-artifact@v4
