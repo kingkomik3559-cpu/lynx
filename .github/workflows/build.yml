@@ -27,7 +27,7 @@ jobs:
       - name: Configure and Compile Lynx
         run: |
           cd lynx-source
-          
+
           export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib -L$(brew --prefix bzip2)/lib"
           export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include -I$(brew --prefix bzip2)/include"
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
@@ -49,7 +49,31 @@ jobs:
           mkdir -p lynx-bin/share
           cp -R "$(brew --prefix ncurses)/share/terminfo" lynx-bin/share/terminfo
 
+          # Statically-linked OpenSSL still needs a CA certificate bundle at
+          # runtime to verify HTTPS sites - that's data, not code, so it
+          # wasn't pulled in by static linking. Bundle the standard
+          # curl/Mozilla trust bundle so HTTPS works without prompting.
           curl -fSL https://curl.se/ca/cacert.pem -o lynx-bin/etc/cacert.pem
+
+          cat > lynx-bin/etc/mime.types << 'EOF'
+          image/jpeg    jpg jpeg jpe
+          image/png     png
+          image/gif     gif
+          image/webp    webp
+          image/bmp     bmp
+          image/tiff    tif tiff
+          image/heic    heic
+          video/mp4     mp4 m4v
+          video/quicktime mov
+          video/x-matroska mkv
+          video/webm    webm
+          video/mpeg    mpeg mpg
+          EOF
+
+          cat > lynx-bin/etc/mailcap << 'EOF'
+          image/*; open -a Preview.app %s
+          video/*; __MPV_PATH__ %s
+          EOF
 
           cd lynx-bin/bin
           mv lynx lynx-real
@@ -67,7 +91,16 @@ jobs:
           ROOT_DIR="$(cd "$BIN_DIR/.." >/dev/null 2>&1 && pwd)"
           export TERMINFO="$ROOT_DIR/share/terminfo"
           export SSL_CERT_FILE="$ROOT_DIR/etc/cacert.pem"
-          exec "$BIN_DIR/lynx-real" -cfg="$ROOT_DIR/etc/lynx.cfg" -lss="$ROOT_DIR/etc/lynx.lss" "$@"
+
+          MAILCAP_TMP="$(mktemp)"
+          if [ -x "$ROOT_DIR/mpv/bin/mpv" ]; then
+            MPV_PATH="$ROOT_DIR/mpv/bin/mpv"
+          else
+            MPV_PATH="mpv"
+          fi
+          sed "s#__MPV_PATH__#$MPV_PATH#" "$ROOT_DIR/etc/mailcap" > "$MAILCAP_TMP"
+
+          exec "$BIN_DIR/lynx-real" -cfg="$ROOT_DIR/etc/lynx.cfg" -lss="$ROOT_DIR/etc/lynx.lss" -mime_types="$ROOT_DIR/etc/mime.types" -mailcap="$MAILCAP_TMP" "$@"
           EOF
           chmod +x lynx
 
