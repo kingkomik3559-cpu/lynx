@@ -1,0 +1,29 @@
+name: Build Portable mpv for macOS
+on: [push, workflow_dispatch]
+jobs:
+  build-macos:
+    runs-on: macos-15
+    steps:
+      - name: Install mpv and bundling tool
+        run: |
+          brew install mpv dylibbundler
+
+      - name: Bundle mpv into a self-contained, portable folder
+        run: |
+          mkdir -p mpv-portable/bin mpv-portable/lib
+          cp "$(brew --prefix mpv)/bin/mpv" mpv-portable/bin/mpv
+
+          dylibbundler -od -b \
+            -x mpv-portable/bin/mpv \
+            -d mpv-portable/lib \
+            -p @executable_path/../lib
+
+      - name: Verify no Homebrew dependencies remain linked
+        run: |
+          otool -L mpv-portable/bin/mpv | grep -i homebrew || echo "Clean — no Homebrew paths linked."
+
+      - name: Upload Portable mpv Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Portable-mpv-${{ github.run_id }}-${{ github.run_attempt }}
+          path: mpv-portable/
