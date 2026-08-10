@@ -1,30 +1,37 @@
 name: Compile Lynx for macOS
-on: [push, workflow_dispatch]
+on: [push, workflow_dispatch] # workflow_dispatch adds a manual "Run" button
 jobs:
   build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
- 
+
       - name: Install System Build Dependencies
         run: |
           brew install openssl bzip2 ncurses pkg-config
- 
+
       - name: Download and Unpack Lynx Source Code
         run: |
           curl -fSL https://invisible-island.net/archives/lynx/tarballs/lynx2.9.3.tar.gz -o lynx.tar.gz
           tar -xf lynx.tar.gz
           mv lynx2.9.3 lynx-source
- 
+
+      - name: Force static linking of Homebrew libraries
+        run: |
+          mkdir -p /tmp/dylib-backup
+          for prefix in "$(brew --prefix ncurses)" "$(brew --prefix openssl)" "$(brew --prefix bzip2)"; do
+            find "$prefix/lib" -name "*.dylib" -exec mv {} /tmp/dylib-backup/ \;
+          done
+
       - name: Configure and Compile Lynx
         run: |
           cd lynx-source
- 
-          export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib"
-          export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include"
+
+          export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix ncurses)/lib -L$(brew --prefix bzip2)/lib"
+          export CPPFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix ncurses)/include -I$(brew --prefix bzip2)/include"
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
- 
+
           ./configure \
             --prefix=$GITHUB_WORKSPACE/lynx-bin \
             --with-ssl \
@@ -33,10 +40,20 @@ jobs:
             --with-bzlib \
             --enable-ipv6 \
             --enable-locale-charset
- 
+
           make
           make install
- 
+
+      - name: Verify no Homebrew dependencies remain linked
+        run: |
+          otool -L lynx-bin/bin/lynx | grep -i homebrew || echo "Clean — no Homebrew paths linked."
+
+      - name: Compress and Upload Lynx Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Lynx-Executable
+          path: lynx-bin/          
+          
       - name: Compress and Upload Lynx Binary Artifact
         uses: actions/upload-artifact@v4
         with:
